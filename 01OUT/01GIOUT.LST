@@ -1,0 +1,80 @@
+Turbo Assembler	 Version 4.1	    02/17/22 23:48:24	    Page 1
+01giout.asm
+
+
+
+      1	0000			     .model tiny
+      2	0000			     .code
+      3
+      4				     org 100h
+      5
+      6	0100			     start:
+      7					     ; Set video mode
+      8	0100  B8 0013			     mov ax, 0013h
+      9	0103  CD 10			     int 10h
+     10
+     11	0105  BF 0000			     mov di, 0
+     12
+     13	0108  B9 0001			     mov cx, 1
+     14	010B  8A 1E 001Dr		     mov bl, color
+     15	010F  B4 0E			     mov ah, 0Eh
+     16
+     17	0111			     mainLoop:
+     18	0111  8A 85 0000r		     mov al, byte ptr [msg + di]
+     19	0115  CD 10			     int 10h
+     20
+     21	0117  47			     inc di
+     22	0118  83 FF 1C 90		     cmp di, len
+     23	011C  75 F3			     jne mainLoop
+     24
+     25	011E			     exit:
+     26	011E  B8 4C00			     mov ax, 4c00h
+     27	0121  CD 21			     int 21h
+     28
+     29	0123			     .data
+     30	0000  48 65 6C 6C 6F 2C	20+	     msg     db	     "Hello, world!) ahahah FATHER", '$'
+     31	      77 6F 72 6C 64 21	29+
+     32	      20 61 68 61 68 61	68+
+     33	      20 46 41 54 48 45	52+
+     34	      24
+     35	      =001C			     len     equ     $ - msg - 1
+     36	001D  05			     color   db	     05h
+     37
+     38				     end start
+Turbo Assembler	 Version 4.1	    02/17/22 23:48:24	    Page 2
+Symbol Table
+
+
+
+
+Symbol Name			  Type	 Value
+
+??DATE				  Text	 "02/17/22"
+??FILENAME			  Text	 "01giout "
+??TIME				  Text	 "23:48:24"
+??VERSION			  Number 040A
+@32BIT				  Text	 0
+@CODE				  Text	 DGROUP
+@CODESIZE			  Text	 0
+@CPU				  Text	 0101H
+@CURSEG				  Text	 _DATA
+@DATA				  Text	 DGROUP
+@DATASIZE			  Text	 0
+@FILENAME			  Text	 01GIOUT
+@INTERFACE			  Text	 000H
+@MODEL				  Text	 1
+@STACK				  Text	 DGROUP
+@WORDSIZE			  Text	 2
+COLOR				  Byte	 DGROUP:001D
+EXIT				  Near	 DGROUP:011E
+LEN				  Number 001C
+MAINLOOP			  Near	 DGROUP:0111
+MSG				  Byte	 DGROUP:0000
+START				  Near	 DGROUP:0100
+
+Groups & Segments		  Bit Size Align  Combine Class
+
+DGROUP				  Group
+  _DATA				  16  001E Word	  Public  DATA
+  _TEXT				  16  0123 Word	  Public  CODE
+

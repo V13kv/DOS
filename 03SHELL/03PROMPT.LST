@@ -1,0 +1,379 @@
+Turbo Assembler	 Version 4.1	    02/21/22 02:20:45	    Page 1
+03prompt.asm
+
+
+
+      1	0000			     .model tiny
+      2
+      3	0000			     .data
+      4					     ; Up left rectangle corner	coordinates
+      5	      =0014			     x1	     equ     20
+      6	      =0004			     y1	     equ     4
+      7
+      8					     ; Down right rectangle corner coordinates
+      9	      =003C			     x2	     equ     60
+     10	      =000E			     y2	     equ     14
+     11
+     12					     ;---------------------Command line	prompt data-------------------------
+     13	0000  95			     stringColor     db	     95h
+     14	      =02A8			     calcPosOfText   equ     (80 * y1 +	x1) * 2
+     15					     ;----------------------------------------------------------------------
+     16
+     17	0001			     .code
+     18				     org 100h
+     19
+     20				     ; TODO: remove basic command line prompt
+     21				     ; TODO: frame animation
+     22	0100			     _start:
+     23	0100  BC 04AF 90		     mov sp, 100h + length_of_program +	200h
+     24
+     25	0104  B4 4A			     mov ah, 4Ah
+     26	      =04AF			     stack_shift = 100h	+ length_of_program + 200h
+     27	0106  BB 004B			     mov bx, (stack_shift shr 4) + 1
+     28	0109  CD 21			     int 21h
+     29
+     30					     ;-------------------DISABLE BACKGROUND BLINK---------------------------
+     31					     ; TODO: docs
+     32	010B  E8 00A6			     call disableBgBlink
+     33					     ;------------------END DISABLING BACKGROUND BLINK----------------------
+     34
+     35					     ;-------------------------DRAW FRAME-----------------------------------
+     36	010E  BB B800			     mov bx, 0B800h
+     37	0111  8E C3			     mov es, bx		   ; prepare ES	segment	register - video mem address
+     38
+     39	0113  E8 001B			     call drawFrame
+     40					     ;------------------------END DRAW FRAME--------------------------------
+     41
+     42					     ;----------GET STRING REPRESENTATION OF COMMAND LINE PROMPT------------
+     43					     ;TODO: refactor + docs
+     44	0116  E8 00F1			     call cmdPromptCtor
+     45					     ;------END	GETTING	STRING REPRESENTATION OF COMMAND LINE PROMPT--------
+     46
+     47	0119  57			     push di	     ; save command line length
+     48
+     49					     ;-----------------CONSTRUCTED COMMAND LINE	PROMPT OUTPUT---------------
+     50					     ; TODO: refactor +	docs
+     51	011A  BF 02A8			     mov di, calcPosOfText
+     52	011D  8B F2			     mov si, dx
+     53	011F  E8 0083			     call printString
+     54					     ;------END	CONSTRUCTION OF	COMMAND	LINE PROMPT OUTPUT------------------
+     55
+     56					     ; Set cursor position
+     57	0122  B4 02			     mov ah, 02h
+Turbo Assembler	 Version 4.1	    02/21/22 02:20:45	    Page 2
+03prompt.asm
+
+
+
+     58	0124  32 FF			     xor bh, bh
+     59	0126  B6 01			     mov dh, 1
+     60	0128  B2 14			     mov dl, 20
+     61	012A  CD 10			     int 10h
+     62	012C			     exit:
+     63	012C  B8 4C00			     mov ax, 4C00h
+     64	012F  CD 21			     int 21h
+     65
+     66				     include 03dlib.asm
+1    67	0131			     .data
+1    68					     ;------------------------DRAW FRAME DATA--------------------------------
+1    69	      =9100			     whitespaceWAttrs	     equ 9100h
+1    70
+1    71	0001  0FC9			     upLeft	     dw	     0FC9h
+1    72	0003  0FBB			     upRight	     dw	     0FBBh
+1    73	0005  0FC8			     downLeft	     dw	     0FC8h
+1    74	0007  0FBC			     downRight	     dw	     0FBCh
+1    75	0009  0FBA			     verticalPipe    dw	     0FBAh
+1    76	000B  0FCD			     horizontalPipe  dw	     0FCDh
+1    77					     ;------------------------END OF DRAW FRAME	DATA------------------------
+1    78
+1    79					     ;------------
+1    80	000D  00			     endOfString     db	     00h
+1    81					     ;----------
+1    82	000E			     .code
+1    83
+1    84				     ;------------------------------------------------------------------------------
+1    85				     ; Description: Frame drawing procedure
+1    86				     ; Preparation: Video memory address should	be in ES segment register
+1    87				     ; Changed registers: ax, cx, bx, di, si
+1    88				     ;------------------------------------------------------------------------------
+1    89	0131			     drawFrame proc
+1    90				     ;ARG fillSymbolWAttrs:word
+1    91
+1    92	0131  B8 9100			     mov ax, whiteSpaceWAttrs	     ; Rectangle fill symbols
+1    93
+1    94	0134  B9 004C			     mov cx, 76
+1    95	0137  BB 0017			     mov bx, 23
+1    96	013A  BF 0051			     mov di, 81
+1    97	013D  33 F6			     xor si, si
+1    98
+1    99	013F			     winWidth:
+1   100	013F  AB			     stosw
+1   101	0140  E2 FD			     loop winWidth
+1   102
+1   103	0142			     winHeight:
+1   104	0142  46			     inc si
+1   105
+1   106	0143  B9 004C			     mov cx, 76
+1   107	0146  3B F3			     cmp si, bx
+1   108	0148  75 F8			     jne winHeight
+1   109
+1   110				     ;another
+1   111	014A  B9 0028			     mov cx, x2	- x1		     ; window width
+1   112	014D  BB 000A			     mov bx, y2	- y1		     ; window height
+1   113
+1   114	0150  BF 02A8			     mov di, (80 * y1 +	x1) * 2	     ; offset of start of y1 line
+Turbo Assembler	 Version 4.1	    02/21/22 02:20:45	    Page 3
+03prompt.asm
+
+
+
+1   115	0153  33 F6			     xor si, si			     ; counter
+1   116
+1   117				     ;---------------Reset all memory cells that will be used by our frame-----------
+1   118	0155			     x1_to_x2:
+1   119	0155  AB			     stosw			     ; placing chars directly to video mem
+1   120	0156  E2 FD			     loop x1_to_x2
+1   121
+1   122	0158			     y1_to_y2:
+1   123	0158  83 C7 50			     add di, (80d - (x2	- x1)) * 2
+1   124	015B  46			     inc si
+1   125
+1   126	015C  B9 0028			     mov cx, x2	- x1
+1   127	015F  3B F3			     cmp si, bx
+1   128	0161  75 F2			     jne x1_to_x2
+1   129				     ;-------------------------------------------------------------------------------
+1   130
+1   131				     ;------------------------DRAWING FIRST HORIZONTAL LINE--------------------------
+1   132	0163  BF 0206			     mov di, (80 * y1 +	x1 - 1 - 80) * 2
+1   133	0166  A1 0001r			     mov ax, word ptr [upLeft]
+1   134	0169  AB			     stosw
+1   135
+1   136	016A  A1 000Br			     mov ax, word ptr [horizontalPipe]
+1   137	016D  B9 0028			     mov cx, x2	- x1
+1   138	0170  F3> AB			     rep stosw
+1   139
+1   140	0172  A1 0003r			     mov ax, word ptr [upRight]
+1   141	0175  AB			     stosw
+1   142				     ;---------------------END DRAWING FIRST HORIZONTAL	LINE-------------------------
+1   143
+1   144				     ;----------------DRAW BOTH	LEFT AND RIGHT VERTICALS RECTANGLE SIDES-------------
+1   145	0176  BF 02A6			     mov di, (80 * y1 +	x1 - 1)	* 2
+1   146	0179  A1 0009r			     mov ax, word ptr [verticalPipe]
+1   147	017C  33 F6			     xor si, si			     ; drawn vertical rectangle	side counter
+1   148
+1   149	017E			     rightVerticals:
+1   150	017E  B9 000A			     mov cx, y2	- y1
+1   151	0181			     verticals:
+1   152	0181  AB			     stosw
+1   153
+1   154	0182  81 C7 009E		     add di, 79d * 2
+1   155	0186  E2 F9			     loop verticals
+1   156
+1   157					     ; If loop completed then we've drawn one side (left side),	now draw
+1   158					     ; right side
+1   159	0188  46			     inc si			     ; we successfully draw one	(left) side
+1   160
+1   161	0189  BF 02F8			     mov di, (80 * y1 +	x2) * 2
+1   162	018C  83 FE 02			     cmp si, 2d
+1   163	018F  75 ED			     jne rightVerticals
+1   164				     ;---------------END DRAWING BOTH RECTANGLE	VERTICAL SIDES-----------------------
+1   165
+1   166				     ;---------------------DRAW	BOTTOM RECTANGLE HORIZONTAL LINE---------------------
+1   167	0191  A1 0005r			     mov ax, word ptr [downLeft]
+1   168	0194  BF 08E6			     mov di, (80 * y2 +	x1 - 1)	* 2
+1   169	0197  AB			     stosw
+1   170
+1   171	0198  A1 000Br			     mov ax, word ptr [horizontalPipe]
+Turbo Assembler	 Version 4.1	    02/21/22 02:20:45	    Page 4
+03prompt.asm
+
+
+
+1   172	019B  B9 0028			     mov cx, x2	- x1
+1   173	019E  F3> AB			     rep stosw
+1   174
+1   175	01A0  A1 0007r			     mov ax, word ptr [downRight]
+1   176	01A3  AB			     stosw
+1   177				     ;-------------------END DRAWING BOTTOM RECTANGLE HORIZONTAL LINE----------------
+1   178
+1   179	01A4  C3			     ret
+1   180
+1   181	01A5			     drawFrame endp
+1   182
+1   183				     ;-------------------------------------------------------------------------------
+1   184				     ;---------------------------END OF	DRAW FRAME PROCEDURE-------------------------
+1   185				     ;-------------------------------------------------------------------------------
+1   186
+1   187				     ;-------------------------------------------------------------------------------
+1   188				     ; Description: Prints any string to the screen
+1   189				     ; Used registers:
+1   190				     ;	     1)	Segment: ds, es
+1   191				     ;	     2)	Common:	ax, si,	di
+1   192				     ; Preparation:
+1   193				     ;	     1)	Video memory address should be in ES segment register;
+1   194				     ;	     2)	di (reg) - offset by ES	(ES contains video memory address), where
+1   195				     ;		character will be printed;
+1   196				     ;	     3)	si (reg) - string address.
+1   197				     ; Changed registers: ax
+1   198				     ;-------------------------------------------------------------------------------
+1   199
+1   200	01A5			     printString proc
+1   201
+1   202	01A5  8A 26 0000r		     mov ah, stringColor     ; attributes of output characters
+1   203
+1   204	01A9			     placeChars:
+1   205	01A9  AC			     lodsb		     ; Copying each string character to	al
+1   206
+1   207	01AA  3A 06 000Dr		     cmp al, endOfString
+1   208	01AE  74 03			     je	done
+1   209
+1   210	01B0  AB			     stosw		     ; place each non-end string character directly
+1   211								     ; into video memory
+1   212	01B1  EB F6			     jmp placeChars
+1   213
+1   214	01B3			     done:
+1   215	01B3  C3			     ret
+1   216
+1   217	01B4			     printString endp
+1   218
+1   219
+1   220
+1   221	01B4			     disableBgBlink  proc
+1   222	01B4  B8 1003			     mov ax, 1003h
+1   223	01B7  32 DB			     xor bl, bl
+1   224	01B9  CD 10			     int 10h
+1   225
+1   226	01BB  C3			     ret
+1   227
+1   228	01BC			     disableBgBlink  endp
+Turbo Assembler	 Version 4.1	    02/21/22 02:20:45	    Page 5
+03prompt.asm
+
+
+
+    229				     include 03shlib.asm
+1   230	01BC			     .code
+1   231
+1   232				     ;------------------------------------------------------------------------------
+1   233				     ; Description: construct string representation of command line
+1   234				     ; Preparation: not	needed
+1   235				     ; Changed registers:
+1   236				     ; Return: command prompt string address in	'dx' register with the length of 'di'
+1   237				     ;------------------------------------------------------------------------------
+1   238
+1   239	01BC  6B 65 6B 6C 73 68	65+  promptStart     db	     "keklshell:"
+    240	      6C 6C 3A
+1   241	01C6  43 3A		     driveLetter     db	     "C:"
+1   242	01C8  40*(??)		     currwd	     db	     64	dup (?)
+1   243	0208  24 00		     promptEnd	     db	     "$", 0
+1   244	      =004E		     promptLength    equ     $ - promptStart
+1   245
+1   246	020A			     cmdPromptCtor proc
+1   247
+1   248					     ; Get current drive letter	(as string)
+1   249	020A  B4 19			     mov ah, 19h
+1   250	020C  CD 21			     int 21h
+1   251	020E  04 41			     add al, 'A'
+1   252
+1   253	0210  A2 01C6r			     mov byte ptr [driveLetter], al
+1   254
+1   255					     ; Get current directory (cwd)
+1   256	0213  B4 47			     mov ah, 47h
+1   257	0215  B2 00			     mov dl, 00h
+1   258	0217  BE 01C8r			     mov si, offset currwd
+1   259	021A  CD 21			     int 21h
+1   260
+1   261					     ; Get string length (DO PROCEDURE,	LIB for	string procedures)
+1   262	021C  B0 00			     mov al, 00h		     ; find 0 -	end of cwd string
+1   263	021E  BF 01BCr			     mov di, offset promptStart
+1   264	0221  B9 004E			     mov cx, promptLength
+1   265	0224  F2> AE			     repne scasb
+1   266	0226  4F			     dec di			     ; now di points to	0 byte (end of cwd)
+1   267
+1   268					     ; Concatenate promptEnd with other	prompt parts
+1   269	0227  A0 0208r			     mov al, promptEnd
+1   270	022A  88 05			     mov [di], al
+1   271	022C  47			     inc di
+1   272
+1   273					     ; Get actual length of command prompt
+1   274	022D  BA 01BCr			     mov dx, offset promptStart
+1   275	0230  2B FA			     sub di, dx			     ; di - length of command line prompt
+1   276
+1   277	0232  C3			     ret
+1   278
+1   279	0233			     cmdPromptCtor endp
+    280
+    281	      =01AF		     length_of_program	     equ     $ - _start	+ 124
+    282
+    283				     end _start
+Turbo Assembler	 Version 4.1	    02/21/22 02:20:45	    Page 6
+Symbol Table
+
+
+
+
+Symbol Name			  Type	 Value
+
+??DATE				  Text	 "02/21/22"
+??FILENAME			  Text	 "03prompt"
+??TIME				  Text	 "02:20:45"
+??VERSION			  Number 040A
+@32BIT				  Text	 0
+@CODE				  Text	 DGROUP
+@CODESIZE			  Text	 0
+@CPU				  Text	 0101H
+@CURSEG				  Text	 _TEXT
+@DATA				  Text	 DGROUP
+@DATASIZE			  Text	 0
+@FILENAME			  Text	 03PROMPT
+@INTERFACE			  Text	 000H
+@MODEL				  Text	 1
+@STACK				  Text	 DGROUP
+@WORDSIZE			  Text	 2
+CALCPOSOFTEXT			  Number 02A8
+CMDPROMPTCTOR			  Near	 DGROUP:020A
+CURRWD				  Byte	 DGROUP:01C8
+DISABLEBGBLINK			  Near	 DGROUP:01B4
+DONE				  Near	 DGROUP:01B3
+DOWNLEFT			  Word	 DGROUP:0005
+DOWNRIGHT			  Word	 DGROUP:0007
+DRAWFRAME			  Near	 DGROUP:0131
+DRIVELETTER			  Byte	 DGROUP:01C6
+ENDOFSTRING			  Byte	 DGROUP:000D
+EXIT				  Near	 DGROUP:012C
+HORIZONTALPIPE			  Word	 DGROUP:000B
+LENGTH_OF_PROGRAM		  Number 01AF
+PLACECHARS			  Near	 DGROUP:01A9
+PRINTSTRING			  Near	 DGROUP:01A5
+PROMPTEND			  Byte	 DGROUP:0208
+PROMPTLENGTH			  Number 004E
+PROMPTSTART			  Byte	 DGROUP:01BC
+RIGHTVERTICALS			  Near	 DGROUP:017E
+STACK_SHIFT			  Number 04AF
+STRINGCOLOR			  Byte	 DGROUP:0000
+UPLEFT				  Word	 DGROUP:0001
+UPRIGHT				  Word	 DGROUP:0003
+VERTICALPIPE			  Word	 DGROUP:0009
+VERTICALS			  Near	 DGROUP:0181
+WHITESPACEWATTRS		  Number 9100
+WINHEIGHT			  Near	 DGROUP:0142
+WINWIDTH			  Near	 DGROUP:013F
+X1				  Number 0014
+X1_TO_X2			  Near	 DGROUP:0155
+X2				  Number 003C
+Y1				  Number 0004
+Y1_TO_Y2			  Near	 DGROUP:0158
+Y2				  Number 000E
+_START				  Near	 DGROUP:0100
+Turbo Assembler	 Version 4.1	    02/21/22 02:20:45	    Page 7
+Symbol Table
+
+
+
+
+Groups & Segments		  Bit Size Align  Combine Class
+
+DGROUP				  Group
+  _DATA				  16  000E Word	  Public  DATA
+  _TEXT				  16  0233 Word	  Public  CODE
+

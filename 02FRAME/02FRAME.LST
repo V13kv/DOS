@@ -1,0 +1,190 @@
+Turbo Assembler	 Version 4.1	    02/14/22 02:43:24	    Page 1
+02frame.asm
+
+
+
+      1	0000			     .model tiny
+      2	0000			     .code
+      3
+      4				     org 100h
+      5
+      6	0100			     start:
+      7	0100  8B 1E 0000r		     mov bx, word ptr [videoMemAddr]
+      8	0104  8E C3			     mov es, bx
+      9
+     10	0106  B8 0E00			     mov ax, word ptr [whitespace]   ; Rectangle fill symbols -	whitespace
+*Warning* 02frame.asm(10) [Constant] assumed to	mean immediate constant
+     11
+     12	0109  B9 0045			     mov cx, x2	- x1		     ; window width
+     13	010C  BB 0009			     mov bx, y2	- y1		     ; window height
+     14
+     15	010F  BF 00A2			     mov di, (80 * y1 +	x1) * 2	     ; offset of start of each line
+     16	0112  33 F6			     xor si, si			     ; counter
+     17
+     18
+     19				     ;-----------------------------------------------------------------------------
+     20				     ;---Whitespace all	memory cells (video memory) where rectangle will be drawn--
+     21	0114			     x1_to_x2:
+     22					     ; 2 lines below are stosw instruction
+     23	0114  26: 89 05			     mov es:[di], ax		     ; placing chars directly to video mem
+     24	0117  83 C7 02			     add di, 2
+     25
+     26	011A  E2 F8			     loop x1_to_x2		     ; loop is:
+     27									     ;	     1.	dec cx
+     28									     ;	     2.	cmp cx,	0
+     29									     ;	     2.	jnz <label_name>
+     30
+     31	011C			     y1_to_y2:
+     32	011C  83 C7 16 90		     add di, (80d - (x2	- x1)) * 2
+     33	0120  46			     inc si
+     34
+     35	0121  B9 0045			     mov cx, x2	- x1
+     36	0124  3B F3			     cmp si, bx
+     37	0126  75 EC			     jne x1_to_x2
+     38				     ;-----------------------------------------------------------------------------
+     39
+     40				     ;------------------------------------DRAW-------------------------------------
+     41				     ; 3 lines below are drawing an up left corner
+     42	0128  BF 0000			     mov di, (80 * y1 +	x1 - 1 - 80) * 2
+     43	012B  A1 0002r			     mov ax, word ptr [upLeft]
+     44	012E  AB			     stosw
+     45
+     46	012F  A1 000Cr			     mov ax, word ptr [horizontalPipe]
+     47	0132  B9 0045			     mov cx, x2	- x1
+     48
+     49				     ; ----------------------DRAWING first horizontal line--------------------------
+     50				     ; Loop below is rep stosw instruction
+     51	0135				     loopVertical:
+     52	0135  26: 89 05			     mov es:[di], ax
+     53	0138  83 C7 02			     add di, 2
+     54
+     55	013B  49			     dec cx
+     56	013C  83 F9 00			     cmp cx, 0
+Turbo Assembler	 Version 4.1	    02/14/22 02:43:24	    Page 2
+02frame.asm
+
+
+
+     57	013F  75 F4			     jnz loopVertical
+     58
+     59	0141  A1 0006r			     mov ax, word ptr [upRight]
+     60	0144  AB			     stosw
+     61				     ;-----------------------END DRAWING first horizontal line---------------------
+     62
+     63				     ;--------------DRAW BOTH LEFT AND RIGHT VERTICAL RECTANGLE	SIDES--------------
+     64	0145  BF 00A0			     mov di, (80 * y1 +	x1 - 1)	* 2
+     65	0148  A1 000Ar			     mov ax, word ptr [verticalPipe]
+     66	014B  33 F6			     xor si, si			     ; drawn vertical rectangle	side counter
+     67
+     68	014D			     rightVerticals:
+     69	014D  B9 0009			     mov cx, y2	- y1
+     70	0150			     verticals:
+     71	0150  AB			     stosw
+     72
+     73	0151  81 C7 009E		     add di, 79d * 2
+     74	0155  E2 F9			     loop verticals
+     75
+     76				     ; IF loop completed then we've drawn one side (left side),	now draw right side
+     77	0157  46			     inc si			     ; we successfully draw one	(left) side
+     78
+     79	0158  BF 012C			     mov di, (80 * y1 +	x2) * 2
+     80	015B  83 FE 02			     cmp si, 2d
+     81	015E  75 ED			     jne rightVerticals
+     82				     ; ----------------END DRAWING BOTH	RECTANGLE VERTICAL SIDES--------------------
+     83
+     84				     ; --------------------DRAW	BOTTOM RECTANGLE HORIZONTAL LINE--------------------
+     85	0160  A1 0004r			     mov ax, word ptr [downLeft]
+     86	0163  BF 0640			     mov di, (80 * y2 +	x1 - 1)	* 2
+     87	0166  AB			     stosw
+     88
+     89	0167  A1 000Cr			     mov ax, word ptr [horizontalPipe]
+     90	016A  B9 0045			     mov cx, x2	- x1
+     91	016D  F3> AB			     rep stosw
+     92
+     93	016F  A1 0008r			     mov ax, word ptr [downRight]
+     94	0172  AB			     stosw
+     95				     ; ----------------END DRAWING BOTTOM RECTANGLE HORIZONTAL LINE-----------------
+     96
+     97	0173			     exit:
+     98	0173  B8 4C00			     mov ax, 4c00h
+     99	0176  CD 21			     int 21h
+    100
+    101	0178			     .data
+    102	0000  B800			     videoMemAddr    dw	     0B800h
+    103
+    104	      =0001			     x1		     equ     1
+    105	      =0001			     y1		     equ     1
+    106	      =0046			     x2		     equ     70
+    107	      =000A			     y2		     equ     10
+    108
+    109	      =0E00			     whitespace	     equ     0e00h
+    110
+    111	0002  0FC9			     upLeft	     dw	     0FC9h
+    112	0004  0FC8			     downLeft	     dw	     0FC8h
+    113	0006  0FBB			     upRight	     dw	     0FBBh
+Turbo Assembler	 Version 4.1	    02/14/22 02:43:24	    Page 3
+02frame.asm
+
+
+
+    114	0008  0FBC			     downRight	     dw	     0FBCh
+    115	000A  0FBA			     verticalPipe    dw	     0FBAh
+    116	000C  0FCD			     horizontalPipe  dw	     0FCDh
+    117
+    118				     end start
+Turbo Assembler	 Version 4.1	    02/14/22 02:43:24	    Page 4
+Symbol Table
+
+
+
+
+Symbol Name			  Type	 Value
+
+??DATE				  Text	 "02/14/22"
+??FILENAME			  Text	 "02frame "
+??TIME				  Text	 "02:43:23"
+??VERSION			  Number 040A
+@32BIT				  Text	 0
+@CODE				  Text	 DGROUP
+@CODESIZE			  Text	 0
+@CPU				  Text	 0101H
+@CURSEG				  Text	 _DATA
+@DATA				  Text	 DGROUP
+@DATASIZE			  Text	 0
+@FILENAME			  Text	 02FRAME
+@INTERFACE			  Text	 000H
+@MODEL				  Text	 1
+@STACK				  Text	 DGROUP
+@WORDSIZE			  Text	 2
+DOWNLEFT			  Word	 DGROUP:0004
+DOWNRIGHT			  Word	 DGROUP:0008
+EXIT				  Near	 DGROUP:0173
+HORIZONTALPIPE			  Word	 DGROUP:000C
+LOOPVERTICAL			  Near	 DGROUP:0135
+RIGHTVERTICALS			  Near	 DGROUP:014D
+START				  Near	 DGROUP:0100
+UPLEFT				  Word	 DGROUP:0002
+UPRIGHT				  Word	 DGROUP:0006
+VERTICALPIPE			  Word	 DGROUP:000A
+VERTICALS			  Near	 DGROUP:0150
+VIDEOMEMADDR			  Word	 DGROUP:0000
+WHITESPACE			  Number 0E00
+X1				  Number 0001
+X1_TO_X2			  Near	 DGROUP:0114
+X2				  Number 0046
+Y1				  Number 0001
+Y1_TO_Y2			  Near	 DGROUP:011C
+Y2				  Number 000A
+
+Groups & Segments		  Bit Size Align  Combine Class
+
+DGROUP				  Group
+  _DATA				  16  000E Word	  Public  DATA
+  _TEXT				  16  0178 Word	  Public  CODE
+Turbo Assembler	 Version 4.1	    02/14/22 02:43:24	    Page 5
+Error Summary
+
+
+
+*Warning* 02frame.asm(10) [Constant] assumed to	mean immediate constant
+

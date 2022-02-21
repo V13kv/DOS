@@ -1,0 +1,625 @@
+Turbo Assembler	 Version 4.1	    02/21/22 03:22:06	    Page 1
+04main.asm
+
+
+
+      1	0000			     .model tiny
+      2
+      3	0000			     .data
+      4	0000  48 65 6C 6C 6F 2C	20+	     destString	     db	     "Hello, my	dear", 0
+      5	      6D 79 20 64 65 61	72+
+      6	      00
+      7	000F  48 69 21 00		     string	     db	     "Hi!", 0
+      8	      =0003			     actualStrLen    equ     $ - string	- 1
+      9
+     10	0013  61 63 74 75 61 6C	20+	     actualMsg	     db	     "actual ",	0
+     11	      00
+     12	001B  73 74 72 6C 65 6E	3A+	     strlenMsg	     db	     "strlen: ", 0
+     13	      20 00
+     14
+     15	0024  3039			     number	     dw	     12345
+     16	0026  06*(00)			     buffer	     db	     6 dup (0)
+     17
+     18	002C  31 32 38 38 38 34	35+	     strNumber	     db	     "1288845",	0
+     19	      00
+     20
+     21	0034			     .code
+     22				     org 100h
+     23
+     24	0100			     _start:
+     25	0100  50 55 8B EC C7 46	02+	     push word 0000h
+     26	      0002 5D 50 55 8B EC +
+     27	      C7 46 02 0000 5D
+     28	0114  50 55 8B EC C7 46	02+	     push word 0007h
+     29	      0002 5D 50 55 8B EC +
+     30	      C7 46 02 0007 5D
+     31	0128  50 55 8B EC C7 46	02+	     push offset destString
+     32	      0000r 5D
+     33	0132  50 55 8B EC C7 46	02+	     push word 0B800h
+     34	      0002 5D 50 55 8B EC +
+     35	      C7 46 02 B800 5D
+     36	0146  E8 00E4			     call printStr_cdecl
+     37
+     38					     ; STRLEN_CDECL
+     39					     ;push offset string
+     40					     ;call strlen_cdecl
+     41					     ;add sp, 2
+     42
+     43					     ; ATOI_CDECL
+     44					     ;push offset strNumber
+     45					     ;call atoi_cdecl
+     46					     ;add sp, 2
+     47
+     48					     ; PRINT STRING
+     49					     ;mov ax, 0B800h
+     50					     ;mov es, ax
+     51					     ;xor di, di
+     52
+     53					     ;mov si, offset strNumber	     ; string to print
+     54					     ;mov ah, 07h		     ; string color
+     55					     ;call printStr
+     56
+     57
+Turbo Assembler	 Version 4.1	    02/21/22 03:22:06	    Page 2
+04main.asm
+
+
+
+     58					     ; FIND CHAR
+     59					     ;mov ax, ds
+     60					     ;mov es, ax
+     61
+     62					     ;mov di, offset string
+     63					     ;mov al, '!'
+     64					     ;call strchr
+     65					     ; END FIND	CHAR
+     66
+     67					     ;mov ax, 0B800h
+     68					     ;mov es, ax
+     69					     ;mov al, [di]
+     70					     ;mov si, di
+     71					     ;mov di, 160
+     72					     ;mov ah, 0Eh
+     73					     ;call printChar
+     74	0149			     exit:
+     75	0149  B8 4C00			     mov ax, 4C00h
+     76	014C  CD 21			     int 21h
+     77
+     78				     include 04strlib.asm
+1    79				     LOCALS @@
+1    80
+1    81	      =0000		     stringEndByte   equ     00h
+1    82
+1    83	014E			     .data
+1    84	0034  0A			     base    db	     10d
+1    85
+1    86	0035			     .code
+1    87
+1    88				     ;-------------------------------------------------------------------------------
+1    89				     ; Description: get	string length (works as	strlen C function)
+1    90				     ; Preparation: ax - string	address
+1    91				     ; Changed registers: di, ax, si
+1    92				     ; Return: ax - length of string
+1    93				     ;-------------------------------------------------------------------------------
+1    94	014E			     strlen proc
+1    95	014E  8B F8			     mov di, ax
+1    96	0150  8B F0			     mov si, ax
+1    97	0152  B0 00			     mov al, stringEndByte
+1    98	0154  FC			     cld
+1    99
+1   100				     ;TODO: rep	scasb (use cx)
+1   101	0155			     @@findEndOfStrPos:
+1   102	0155  AE			     scasb			     ; cmp es:[di], al
+1   103									     ; inc di
+1   104	0156  75 FD			     jne @@findEndOfStrPos
+1   105
+1   106	0158  4F			     dec di			     ; di now contains address of stringEndByte	byte
+1   107	0159  2B FE			     sub di, si			     ; di now contains actual string length (without	    +
+    108				     stringEndByte)
+1   109
+1   110	015B  8B C7			     mov ax, di			     ; string length
+1   111
+1   112	015D  C3			     ret
+1   113
+1   114	015E			     strlen endp
+Turbo Assembler	 Version 4.1	    02/21/22 03:22:06	    Page 3
+04main.asm
+
+
+
+1   115
+1   116
+1   117				     ;-------------------------------------------------------------------------------
+1   118				     ; Description: Output String
+1   119				     ; Preparation:  es	- video	memory address (0B800h)
+1   120				     ;		     si	- string address
+1   121				     ;		     ah	- string color
+1   122				     ;		     di	- offset by 0B800 (video memory	address), output start position
+1   123				     ; Changed registers: DF (direction	flag), al, si, di
+1   124				     ; Return: none
+1   125				     ;-------------------------------------------------------------------------------
+1   126	015E			     printStr proc
+1   127
+1   128	015E  FC			     cld
+1   129
+1   130	015F			     @@cycle:
+1   131	015F  AC			     lodsb		     ; mov al, ds:[si]
+1   132								     ; inc si
+1   133	0160  3C 00			     cmp al, stringEndByte
+1   134	0162  74 05			     je	@@done
+1   135
+1   136	0164  E8 0003			     call printChar
+1   137	0167  EB F6			     jmp @@cycle
+1   138
+1   139	0169			     @@done:
+1   140	0169  C3			     ret
+1   141
+1   142	016A			     printStr endp
+1   143
+1   144
+1   145				     ;-------------------------------------------------------------------------------
+1   146				     ; Description: Output Single Char
+1   147				     ; Preparation:  es	- video	memory address (0B800h)
+1   148				     ;		     di	- offset by 0B800h (video memory address), output start	position
+1   149				     ;		     ah	- char color
+1   150				     ;		     al	- char to output
+1   151				     ; Changed registers:
+1   152				     ; Return:
+1   153				     ;-------------------------------------------------------------------------------
+1   154	016A			     printChar	     proc
+1   155
+1   156	016A  AB				     stosw
+1   157
+1   158	016B  C3				     ret
+1   159
+1   160	016C			     printChar	     endp
+1   161
+1   162				     ;-------------------------------------------------------------------------------
+1   163				     ; Description: Find the first occurrence of given char in string (like strchr C func)
+1   164				     ; Preparation:  di	- string address
+1   165				     ;		     al	- char to search for
+1   166				     ; Changed registers:
+1   167				     ; Return: di - address of first occurrence	of given char
+1   168				     ;-------------------------------------------------------------------------------
+1   169	016C			     strchr proc
+1   170
+1   171	016C  FC			     cld
+Turbo Assembler	 Version 4.1	    02/21/22 03:22:06	    Page 4
+04main.asm
+
+
+
+1   172
+1   173	016D			     @@loop:
+1   174	016D  AA			     stosb	     ; cmp al, es:[di]
+1   175							     ; inc di
+1   176	016E  75 FD			     jne @@loop
+1   177	0170  4F			     dec di
+1   178
+1   179	0171			     @@done:
+1   180	0171  C3			     ret
+1   181
+1   182	0172			     strchr endp
+1   183
+1   184
+1   185				     ;--------------------------------------------------------------------------------
+1   186				     ; Description: strncpy C-function
+1   187				     ; Preparation:  di	- destination character	array address
+1   188				     ;		     si	- source character array address
+1   189				     ;		     cx	- count	of characters to copy
+1   190				     ; Changed registers:
+1   191				     ; Return:
+1   192				     ;--------------------------------------------------------------------------------
+1   193	0172			     strncpy proc
+1   194
+1   195	0172  FC			     cld
+1   196
+1   197					     ; Save needed registers
+1   198	0173  8B DF			     mov bx, di
+1   199	0175  8B D6			     mov dx, si
+1   200
+1   201					     ; Determine source	string length (not including stringEndByte)
+1   202	0177  8B C6			     mov ax, si
+1   203	0179  E8 FFD2			     call strlen
+1   204
+1   205					     ; Restore saved registers (cx is not changed by strlen function)
+1   206	017C  8B FB			     mov di, bx
+1   207	017E  8B F2			     mov si, dx
+1   208
+1   209					     ; Determine in which loop to go
+1   210	0180  3B C8			     cmp cx, ax
+1   211	0182  7E 1A			     jle @@copyWOfill
+1   212
+1   213	0184			     @@copyWfill:
+1   214	0184  8B D9			     mov bx, cx		     ; save cx how many	bytes user wants to copy to
+1   215	0186  8B C8			     mov cx, ax		     ; save actual src string length
+1   216
+1   217					     ; Self modification code to reconstruct jmp instr
+1   218	0188  B2 EB			     mov dl, 0EBh
+1   219	018A  B6 F0			     mov dh, @@fillWStrEndBytes	- (jmpStartAddr	+ jmpInstrLen)
+1   220	018C  89 16 01A0r		     mov word ptr [jmpStartAddr], dx	     ; ax contains opcode bytes	in reversed order   +
+    221				     because of	little-endian format
+1   222	0190  EB 0C 90			     jmp @@copyWOfill
+1   223
+1   224	0193			     @@fillWStrEndBytes:
+1   225	0193  2B D8			     sub bx, ax		     ; bx contains number of stringEndByte's to	write to the	    +
+    226				     destination character array
+1   227	0195  8B CB			     mov cx, bx
+1   228
+Turbo Assembler	 Version 4.1	    02/21/22 03:22:06	    Page 5
+04main.asm
+
+
+
+1   229	0197  B0 00			     mov al, stringEndByte   ; with what symbol	to fill	the rest of the	dest string
+1   230	0199  F3> AA			     rep stosb		     ; move cx stringEndByte characters
+1   231
+1   232	019B  EB 06 90			     jmp @@done
+1   233
+1   234	019E			     @@copyWOfill:
+1   235	019E  F3> A4			     repz movsb		     ; mov es:[di], ds:[si]
+1   236								     ; inc si
+1   237								     ; inc di
+1   238								     ; dec cx
+1   239								     ; jnz <exit>
+1   240								     ; cmp cx, 0
+1   241								     ; jz <exit>
+1   242	      =DGROUP:01A0		     jmpStartAddr	     equ     $
+1   243	01A0  EB 01 90			     jmp @@done
+1   244	      =0003			     jmpInstrLen	     equ     $ - jmpStartAddr
+1   245
+1   246				     ; TODO: return a copy of dest character array
+1   247	01A3			     @@done:
+1   248	01A3  C3			     ret
+1   249
+1   250	01A4			     strncpy endp
+1   251
+1   252
+1   253
+1   254				     ;-------------------------------------------------------------------------------
+1   255				     ; Description: strncmp C-function
+1   256				     ; Preparation:  si	- first	string ended with stringEndByte
+1   257				     ;		     di	- second string	ended with stringEndByte
+1   258				     ;		     cx	- maximum number of characters to compare
+1   259				     ; Changed registers:
+1   260				     ; Return:	al = -1	if si appears before di	in lexographical order
+1   261				     ;		al = 0 if si and di compare equal, or if cx is zero
+1   262				     ;		al = 1 if si appears after di in lexographical order
+1   263				     ;-------------------------------------------------------------------------------
+1   264	01A4			     strncmp proc
+1   265
+1   266	01A4  83 F9 00			     cmp cx, 0
+1   267	01A7  74 1B			     jz	@@done
+1   268
+1   269	01A9			     @@cycle:
+1   270					     ; Check for not equivalence
+1   271	01A9  8A 04			     mov al, [si]
+1   272	01AB  3A 05			     cmp al, [di]
+1   273	01AD  75 0B			     jne @@done1
+1   274
+1   275					     ; Check for string	end
+1   276	01AF  3C 00			     cmp al, stringEndByte
+1   277	01B1  74 07			     je	@@done1
+1   278
+1   279					     ; Take another characters
+1   280	01B3  46			     inc si
+1   281	01B4  47			     inc di
+1   282
+1   283	01B5  49			     dec cx
+1   284	01B6  E3 07			     jcxz @@done2
+1   285
+Turbo Assembler	 Version 4.1	    02/21/22 03:22:06	    Page 6
+04main.asm
+
+
+
+1   286	01B8  EB EF			     jmp @@cycle
+1   287
+1   288	01BA			     @@done1:
+1   289	01BA  2A 05			     sub al, [di]
+1   290	01BC  EB 06 90			     jmp @@done
+1   291
+1   292	01BF			     @@done2:
+1   293	01BF  32 C0			     xor al, al
+1   294	01C1  EB 01 90			     jmp @@done
+1   295
+1   296	01C4			     @@done:
+1   297	01C4  C3			     ret
+1   298
+1   299	01C5			     strncmp endp
+1   300
+1   301
+1   302
+1   303				     ;-------------------------------------------------------------------------------
+1   304				     ; Description: itoa C-function
+1   305				     ; Preparation:  ax	- number which will be translated into string
+1   306				     ;		     di	- address of the buffer	where the string will be placed
+1   307				     ;		     bl	- radix	value:
+1   308				     ;			     1)	10 - DECIMAL
+1   309				     ;			     2)	16 - HEX
+1   310				     ; Changed registers:
+1   311				     ; Return: di - pointer to the beginning of	the string
+1   312				     ;-------------------------------------------------------------------------------
+1   313	01C5			     itoa proc
+1   314
+1   315	01C5  8B F7			     mov si, di		     ; save start address of the buffer
+1   316
+1   317					     ; TODO: decide whether to use 10 or 16 depending on bl
+1   318	01C7  32 ED			     xor ch, ch
+1   319	01C9  8A CB			     mov cl, bl		     ; radix value to cx
+1   320	01CB			     @@divloop:
+1   321	01CB  33 D2			     xor dx, dx		     ; zero out	the remainder
+1   322	01CD  F7 F9			     idiv cx		     ; ax - quotient
+1   323								     ; dx - remainder
+1   324
+1   325	01CF  83 C2 30			     add dx, '0'	     ; convert remainder to char representation
+1   326	01D2  88 15			     mov [di], dl	     ; move remainder to the buffer
+1   327	01D4  47			     inc di
+1   328
+1   329	01D5  3D 0000			     cmp ax, 0
+1   330	01D8  75 F1			     jnz @@divloop
+1   331
+1   332	01DA			     @@reverseBuffer:
+1   333	01DA  8B D6			     mov dx, si	     ; save start address of the buffer
+1   334
+1   335	01DC  8B CF			     mov cx, di
+1   336	01DE  2B CE			     sub cx, si	     ; ax - length of the string
+1   337	01E0  D1 E9			     shr cx, 1	     ; div string length by 2
+1   338
+1   339	01E2  4F			     dec di
+1   340	01E3			     @@xchgCycle:
+1   341					     ; Exchange	values (4 moves	are still cheeper than 1 mov + 1 xchg)
+1   342	01E3  8A 04			     mov al, [si]
+Turbo Assembler	 Version 4.1	    02/21/22 03:22:06	    Page 7
+04main.asm
+
+
+
+1   343	01E5  8A 1D			     mov bl, [di]
+1   344
+1   345	01E7  88 1C			     mov [si], bl
+1   346	01E9  88 05			     mov [di], al
+1   347
+1   348	01EB  46			     inc si
+1   349	01EC  4F			     dec di
+1   350
+1   351	01ED  E2 F4			     loop @@xchgCycle
+1   352
+1   353	01EF			     @@done:
+1   354	01EF  8B FA			     mov di, dx	     ; pointer to the char buffer
+1   355
+1   356	01F1  C3			     ret
+1   357
+1   358	01F2			     itoa endp
+1   359
+1   360
+1   361
+1   362				     ;-------------------------------------------------------------------------------
+1   363				     ; Description: atoi C-function
+1   364				     ; Preparation:  si	- string address (ending with stringEndByte)
+1   365				     ; Changed registers: ax, bx, cx, dx, si, di
+1   366				     ; Return: ax - number
+1   367				     ;-------------------------------------------------------------------------------
+1   368	01F2			     atoi proc
+1   369	01F2  33 D2			     xor dx, dx		     ; dx - final number translated from string
+1   370	01F4  8B DE			     mov bx, si		     ; save si
+1   371
+1   372					     ; Get string length
+1   373	01F6  8B C6			     mov ax, si
+1   374	01F8  E8 FF53			     call strlen
+1   375
+1   376	01FB  8B C8			     mov cx, ax		     ; cx - unproceeded	chars counter (not including stringEndByte)
+1   377	01FD  8B F3			     mov si, bx		     ; restore si
+1   378	01FF  33 C0			     xor ax, ax
+1   379
+1   380	0201  FC			     cld
+1   381
+1   382	0202			     @@cycle:
+1   383	0202  AC			     lodsb		     ; mov al, ds:[si]
+1   384								     ; inc si
+1   385
+1   386					     ; Check for the end
+1   387	0203  80 FB 00			     cmp bl, stringEndByte
+1   388	0206  74 11			     je	@@done
+1   389
+1   390	0208  2C 30			     sub al, '0'	     ; al - digit representation
+1   391
+1   392	020A  8B D9			     mov bx, cx		     ; save cx (unproceeded chars counter)
+1   393	020C  4B			     dec bx
+1   394
+1   395	020D			     @@degreeCycle:
+1   396	020D  F6 26 0034r		     mul [base]		     ; ax - multiplication result, 10 -	radix
+1   397	0211  E2 FA			     loop @@degreeCycle
+1   398
+1   399	0213  03 D0			     add dx, ax		     ; construction of the number
+Turbo Assembler	 Version 4.1	    02/21/22 03:22:06	    Page 8
+04main.asm
+
+
+
+1   400
+1   401	0215  8B CB			     mov cx, bx		     ; restore unproceeded chars counter
+1   402	0217  E2 E9			     loop @@cycle
+1   403
+1   404	0219			     @@done:
+1   405	0219  8B C2			     mov ax, dx		     ; ax - final number (result)
+1   406
+1   407	021B  C3			     ret
+1   408
+1   409	021C			     atoi endp
+    410				     include W:\PROGS\05STACK\05wraps.asm
+1   411				     ;-------------------------------CDECL CONVENTION--------------------------------
+1   412				     ; Subroutine arguments are	passed on the stack in reverse order.
+1   413				     ; Integer values and memory addresses are returned	in the AX register.
+1   414				     ; Registers ax, cx, dx are	caller-saved, and the rest are callee-saved.
+1   415				     ; The caller cleans the stack after the function call returns.
+1   416				     ;-------------------------------------------------------------------------------
+1   417	021C			     strlen_cdecl proc
+1   418					     ; SAVE CONTEXT
+1   419	021C  55			     push bp
+1   420	021D  8B EC			     mov bp, sp
+1   421
+1   422					     ; Save used registers in the subroutine strlen
+1   423	021F  53			     push bx
+1   424	0220  56			     push si
+1   425	0221  57			     push di
+1   426
+1   427	0222  8B 46 04			     mov ax, [bp + 4]
+1   428	0225  E8 FF26			     call strlen
+1   429
+1   430					     ; RESTORE REGISTERS
+1   431	0228  5F			     pop di
+1   432	0229  5E			     pop si
+1   433	022A  5B			     pop bx
+1   434
+1   435					     ; RESTORE CONTEXT
+1   436	022B  5D			     pop bp
+1   437
+1   438	022C  C3			     ret
+1   439
+1   440	022D			     strlen_cdecl endp
+1   441
+1   442
+1   443	022D			     printStr_cdecl  proc
+1   444	022D  55			     push bp
+1   445	022E  8B EC			     mov bp, sp
+1   446
+1   447	0230  53			     push bx
+1   448	0231  56			     push si
+1   449	0232  57			     push di
+1   450
+1   451	0233  8B 7E 0A			     mov di, [bp + 10d]	; di - 0000h
+1   452	0236  8B 46 08			     mov ax, [bp + 8d] ; ax - 0007h
+1   453	0239  8B 76 06			     mov si, [bp + 6d] ; si - setString
+1   454	023C  8E 46 04			     mov es, [bp + 4d] ; es = 0B800h
+1   455	023F  E8 FF1C			     call printStr
+1   456
+Turbo Assembler	 Version 4.1	    02/21/22 03:22:06	    Page 9
+04main.asm
+
+
+
+1   457	0242  5F			     pop di
+1   458	0243  5E			     pop si
+1   459	0244  5B			     pop bx
+1   460
+1   461	0245  5D			     pop bp
+1   462
+1   463	0246  C3			     ret
+1   464
+1   465	0247			     printStr_cdecl  endp
+1   466
+1   467
+1   468	0247			     atoi_cdecl	proc
+1   469					     ; SAVE CONTEXT
+1   470	0247  55			     push bp
+1   471	0248  8B EC			     mov bp, sp
+1   472
+1   473					     ; register, excluding ax, cx, dx are callee-saved
+1   474	024A  53			     push bx
+1   475	024B  56			     push si
+1   476	024C  57			     push di
+1   477
+1   478	024D  8B 46 04			     mov ax, [bp + 4]
+1   479	0250  E8 FF9F			     call atoi
+1   480
+1   481					     ; restore saved registers
+1   482	0253  5F			     pop di
+1   483	0254  5E			     pop si
+1   484	0255  5B			     pop bx
+1   485
+1   486					     ; RESTORE CONTEXT
+1   487	0256  5D			     pop bp
+1   488
+1   489	0257  C3			     ret
+1   490
+1   491	0258			     atoi_cdecl	endp
+1   492
+1   493
+1   494
+    495
+    496	      =0158		     length_of_program	     equ     $ - _start
+    497
+    498				     end _start
+Turbo Assembler	 Version 4.1	    02/21/22 03:22:06	    Page 10
+Symbol Table
+
+
+
+
+Symbol Name			  Type	 Value
+
+??DATE				  Text	 "02/21/22"
+??FILENAME			  Text	 "04main  "
+??TIME				  Text	 "03:22:05"
+??VERSION			  Number 040A
+@32BIT				  Text	 0
+@@COPYWFILL			  Near	 DGROUP:0184
+@@COPYWOFILL			  Near	 DGROUP:019E
+@@CYCLE				  Near	 DGROUP:015F
+@@CYCLE				  Near	 DGROUP:01A9
+@@CYCLE				  Near	 DGROUP:0202
+@@DEGREECYCLE			  Near	 DGROUP:020D
+@@DIVLOOP			  Near	 DGROUP:01CB
+@@DONE				  Near	 DGROUP:0169
+@@DONE				  Near	 DGROUP:0171
+@@DONE				  Near	 DGROUP:01A3
+@@DONE				  Near	 DGROUP:01C4
+@@DONE				  Near	 DGROUP:01EF
+@@DONE				  Near	 DGROUP:0219
+@@DONE1				  Near	 DGROUP:01BA
+@@DONE2				  Near	 DGROUP:01BF
+@@FILLWSTRENDBYTES		  Near	 DGROUP:0193
+@@FINDENDOFSTRPOS		  Near	 DGROUP:0155
+@@LOOP				  Near	 DGROUP:016D
+@@REVERSEBUFFER			  Near	 DGROUP:01DA
+@@XCHGCYCLE			  Near	 DGROUP:01E3
+@CODE				  Text	 DGROUP
+@CODESIZE			  Text	 0
+@CPU				  Text	 0101H
+@CURSEG				  Text	 _TEXT
+@DATA				  Text	 DGROUP
+@DATASIZE			  Text	 0
+@FILENAME			  Text	 04MAIN
+@INTERFACE			  Text	 000H
+@MODEL				  Text	 1
+@STACK				  Text	 DGROUP
+@WORDSIZE			  Text	 2
+ACTUALMSG			  Byte	 DGROUP:0013
+ACTUALSTRLEN			  Number 0003
+ATOI				  Near	 DGROUP:01F2
+ATOI_CDECL			  Near	 DGROUP:0247
+BASE				  Byte	 DGROUP:0034
+BUFFER				  Byte	 DGROUP:0026
+DESTSTRING			  Byte	 DGROUP:0000
+EXIT				  Near	 DGROUP:0149
+ITOA				  Near	 DGROUP:01C5
+JMPINSTRLEN			  Number 0003
+JMPSTARTADDR			  Number DGROUP:01A0
+LENGTH_OF_PROGRAM		  Number 0158
+NUMBER				  Word	 DGROUP:0024
+PRINTCHAR			  Near	 DGROUP:016A
+PRINTSTR			  Near	 DGROUP:015E
+PRINTSTR_CDECL			  Near	 DGROUP:022D
+STRCHR				  Near	 DGROUP:016C
+STRING				  Byte	 DGROUP:000F
+Turbo Assembler	 Version 4.1	    02/21/22 03:22:06	    Page 11
+Symbol Table
+
+
+
+STRINGENDBYTE			  Number 0000
+STRLEN				  Near	 DGROUP:014E
+STRLENMSG			  Byte	 DGROUP:001B
+STRLEN_CDECL			  Near	 DGROUP:021C
+STRNCMP				  Near	 DGROUP:01A4
+STRNCPY				  Near	 DGROUP:0172
+STRNUMBER			  Byte	 DGROUP:002C
+_START				  Near	 DGROUP:0100
+
+Groups & Segments		  Bit Size Align  Combine Class
+
+DGROUP				  Group
+  _DATA				  16  0035 Word	  Public  DATA
+  _TEXT				  16  0258 Word	  Public  CODE
+
