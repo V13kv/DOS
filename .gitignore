@@ -1,4 +1,5 @@
-*.COM
-*.LST
-*.MAP
-*.OBJ
+**.COM
+**.LST
+**.MAP
+**.OBJ
+**.NCD
